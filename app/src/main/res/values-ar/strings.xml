@@ -18,8 +18,7 @@
     <string name="pick_category">اختر الفئة</string>
     <string name="add_files">+ إضافة ملفات من المعرض</string>
     <string name="new_playlist_btn">+ قائمة تشغيل جديدة</string>
-    <string name="scan_btn">فحص القنوات (متبقٍ %1$d)</string>
-    <string name="scan_stop">إيقاف الفحص</string>
+    <string name="scan_stop">إيقاف</string>
     <string name="status_items">%1$d عنصر</string>
     <string name="status_hidden">%1$d مخفي</string>
     <string name="status_loading_list">جارٍ تحميل القائمة…</string>
@@ -123,7 +122,8 @@
     <string name="status_none">لا شيء هنا بعد</string>
     <string name="status_ch_number">القناة %1$d</string>
     <string name="mode_world">العالم</string>
-    <string name="scan_done">تم فحص جميع القنوات</string>
     <string name="more_verified">الموثّقة فقط: %1$s</string>
     <string name="status_verified">%1$d موثّقة</string>
+    <string name="scan_short">فحص</string>
+    <string name="scan_left">فحص (%1$d)</string>
 </resources>

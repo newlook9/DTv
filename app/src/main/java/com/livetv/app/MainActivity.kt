@@ -87,6 +87,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnFull: TextView
     private lateinit var btnMore: TextView
     private lateinit var btnAction: TextView
+    private lateinit var btnScan: TextView
     private lateinit var btnMode: TextView
     private lateinit var btnItem: TextView
     private lateinit var radioCard: LinearLayout
@@ -630,6 +631,10 @@ class MainActivity : AppCompatActivity() {
         header.setPadding(ui.dp(12), ui.dp(8), ui.dp(12), ui.dp(4))
         header.addView(logoIv, ui.lp(ui.dp(40), ui.dp(40), 0f, 0, 0, 10, 0))
         header.addView(tcol, ui.lp(0, wrap, 1f))
+        btnScan = mkBtn("") { if (scanning) stopScan() else startScan() }
+        btnScan.setPadding(ui.dp(12), ui.dp(8), ui.dp(12), ui.dp(8))
+        btnScan.visibility = View.GONE
+        header.addView(btnScan, ui.lp(wrap, wrap, 0f, 6, 0, 0, 0))
 
         val labels = listOf(
             getString(R.string.tab_tv), getString(R.string.tab_radio), getString(R.string.tab_fav),
@@ -667,26 +672,26 @@ class MainActivity : AppCompatActivity() {
             ui.picker(
                 this,
                 getString(if (mode == 0) R.string.pick_country else R.string.pick_category),
-                curItems.map { it.label }, curIdx
+                curItems.map { it.label }, curIdx, true
             ) { pos -> selectItem(pos) }
         }
         for (b in listOf(btnMode, btnItem)) {
             b.gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            b.setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
+            b.setPadding(ui.dp(10), ui.dp(10), ui.dp(10), ui.dp(10))
             b.maxLines = 1
             b.ellipsize = TextUtils.TruncateAt.END
             b.textSize = 14f
         }
         pickRow = LinearLayout(this)
         pickRow.orientation = LinearLayout.HORIZONTAL
-        pickRow.addView(btnMode, ui.lp(0, wrap, 1f, 0, 0, 4, 0))
-        pickRow.addView(btnItem, ui.lp(0, wrap, 1.4f, 4, 0, 0, 0))
+        pickRow.addView(btnMode, ui.lp(wrap, wrap, 0f, 0, 0, 4, 0))
+        pickRow.addView(btnItem, ui.lp(0, wrap, 1f))
 
         search = EditText(this)
         search.hint = getString(R.string.search_hint)
         search.setSingleLine(true)
-        search.textSize = 15f
-        search.setPadding(ui.dp(14), ui.dp(10), ui.dp(14), ui.dp(10))
+        search.textSize = 14f
+        search.setPadding(ui.dp(10), ui.dp(10), ui.dp(10), ui.dp(10))
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
@@ -706,8 +711,12 @@ class MainActivity : AppCompatActivity() {
         panel.addView(header)
         panel.addView(tabs, ui.lp(match, wrap, 0f, 8, 4, 8, 4))
         panel.addView(btnAction, ui.lp(match, wrap, 0f, 8, 2, 8, 4))
-        panel.addView(pickRow, ui.lp(match, wrap, 0f, 8, 2, 8, 4))
-        panel.addView(search, ui.lp(match, wrap, 0f, 8, 2, 8, 4))
+        val filterRow = LinearLayout(this)
+        filterRow.orientation = LinearLayout.HORIZONTAL
+        filterRow.gravity = Gravity.CENTER_VERTICAL
+        filterRow.addView(pickRow, ui.lp(0, wrap, 1.7f, 0, 0, 4, 0))
+        filterRow.addView(search, ui.lp(0, wrap, 1f))
+        panel.addView(filterRow, ui.lp(match, wrap, 0f, 8, 2, 8, 4))
         panel.addView(list, ui.lp(match, 0, 1f))
 
         root.addView(left)
@@ -731,6 +740,8 @@ class MainActivity : AppCompatActivity() {
         }
         btnAction.setTextColor(t.accent)
         btnAction.background = ui.stateBg(ui.rr(ui.alpha(t.accent, 0x28), 12, t.accent, 1), 12)
+        btnScan.setTextColor(t.accent)
+        btnScan.background = ui.stateBg(ui.rr(ui.alpha(t.accent, 0x28), 12, t.accent, 1), 12)
         for (b in listOf(btnMode, btnItem)) {
             b.setTextColor(t.text)
             b.background = ui.stateBg(ui.rr(t.card, 12, ui.alpha(t.sub, 0x66), 1), 12)
@@ -759,13 +770,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateRows() {
         pickRow.visibility = if (tab <= 1) View.VISIBLE else View.GONE
-        val showAction = tab == 0 || tab == 3 || (tab == 4 && openPlaylist == null)
+        val showAction = tab == 3 || (tab == 4 && openPlaylist == null)
         btnAction.visibility = if (showAction) View.VISIBLE else View.GONE
-        btnAction.text = when (tab) {
-            0 -> if (scanning) getString(R.string.scan_stop) else scanLabel()
-            3 -> getString(R.string.add_files)
-            else -> getString(R.string.new_playlist_btn)
-        }
+        btnAction.text = if (tab == 3) getString(R.string.add_files) else getString(R.string.new_playlist_btn)
+        btnScan.visibility = if (tab == 0) View.VISIBLE else View.GONE
+        btnScan.text = if (scanning) "■ " + getString(R.string.scan_stop) else scanLabel()
     }
 
     private fun updatePickerLabels() {
@@ -1492,7 +1501,7 @@ class MainActivity : AppCompatActivity() {
     private fun scanLabel(): String {
         var left = 0
         for (c in loaded) for (u in c.allUrls()) if (Health.state(u) == 0) left++
-        return if (left > 0) getString(R.string.scan_btn, left) else getString(R.string.scan_done)
+        return if (left > 0) getString(R.string.scan_left, left) else "✓ " + getString(R.string.scan_short)
     }
 
     private fun showLanguage() {

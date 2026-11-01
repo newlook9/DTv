@@ -18,8 +18,7 @@
     <string name="pick_category">श्रेणी चुनें</string>
     <string name="add_files">+ गैलरी से फ़ाइलें जोड़ें</string>
     <string name="new_playlist_btn">+ नई प्लेलिस्ट</string>
-    <string name="scan_btn">चैनल स्कैन करें (%1$d बाकी)</string>
-    <string name="scan_stop">स्कैन रोकें</string>
+    <string name="scan_stop">रोकें</string>
     <string name="status_items">%1$d आइटम</string>
     <string name="status_hidden">%1$d छिपे</string>
     <string name="status_loading_list">सूची लोड हो रही है…</string>
@@ -123,7 +122,8 @@
     <string name="status_none">यहाँ अभी कुछ नहीं</string>
     <string name="status_ch_number">चैनल %1$d</string>
     <string name="mode_world">दुनिया</string>
-    <string name="scan_done">सभी चैनल स्कैन हो चुके</string>
     <string name="more_verified">केवल सत्यापित: %1$s</string>
     <string name="status_verified">%1$d सत्यापित</string>
+    <string name="scan_short">स्कैन</string>
+    <string name="scan_left">स्कैन (%1$d)</string>
 </resources>

@@ -18,8 +18,7 @@
     <string name="pick_category">دسته را انتخاب کنید</string>
     <string name="add_files">+ افزودن فایل از گالری</string>
     <string name="new_playlist_btn">+ فهرست پخش جدید</string>
-    <string name="scan_btn">اسکن کانال‌ها (%1$d باقی)</string>
-    <string name="scan_stop">توقف اسکن</string>
+    <string name="scan_stop">توقف</string>
     <string name="status_items">%1$d مورد</string>
     <string name="status_hidden">%1$d پنهان</string>
     <string name="status_loading_list">در حال بارگذاری فهرست…</string>
@@ -123,7 +122,8 @@
     <string name="status_none">هنوز چیزی اینجا نیست</string>
     <string name="status_ch_number">کانال %1$d</string>
     <string name="mode_world">جهان</string>
-    <string name="scan_done">همه کانال‌ها اسکن شدند</string>
     <string name="more_verified">فقط تأییدشده: %1$s</string>
     <string name="status_verified">%1$d تأییدشده</string>
+    <string name="scan_short">اسکن</string>
+    <string name="scan_left">اسکن (%1$d)</string>
 </resources>

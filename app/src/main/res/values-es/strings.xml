@@ -18,8 +18,7 @@
     <string name="pick_category">Elegir categoría</string>
     <string name="add_files">+ Añadir archivos de la galería</string>
     <string name="new_playlist_btn">+ Nueva lista</string>
-    <string name="scan_btn">Escanear canales (faltan %1$d)</string>
-    <string name="scan_stop">Detener escaneo</string>
+    <string name="scan_stop">Detener</string>
     <string name="status_items">%1$d elementos</string>
     <string name="status_hidden">%1$d ocultos</string>
     <string name="status_loading_list">Cargando lista…</string>
@@ -123,7 +122,8 @@
     <string name="status_none">Aún no hay nada</string>
     <string name="status_ch_number">Canal %1$d</string>
     <string name="mode_world">Mundo</string>
-    <string name="scan_done">Todos los canales escaneados</string>
     <string name="more_verified">Solo verificados: %1$s</string>
     <string name="status_verified">%1$d verificados</string>
+    <string name="scan_short">Escanear</string>
+    <string name="scan_left">Escanear (%1$d)</string>
 </resources>

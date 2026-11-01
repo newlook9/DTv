@@ -26,8 +26,13 @@
 ## GitHub secrets needed once (see GITHUB_SECRETS.txt, kept outside this zip)
 KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS
 
-## Part 3 (this zip) - DONE
+## Part 3 - DONE
 - World mode: all channels of the world in one list (TV and Radio), no country needed
 - Search box searches the whole world list at once
 - Scan builds a verified list on the device; "Verified only" switch in More menu
 - Browse by: Country / Category / World
+
+## Part 4 (this zip) - DONE
+- Scan button moved to the top right (next to the Live TV logo)
+- Country and category lists have a search box inside the dropdown
+- Channel search box moved up beside the dropdowns (more room for channels)

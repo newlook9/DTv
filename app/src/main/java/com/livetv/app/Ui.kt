@@ -11,7 +11,11 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -98,19 +102,22 @@ class Ui(private val ctx: Context) {
     }
 
     // A list popup with a clear highlight for remote-control navigation.
+    // With searchable = true a search box filters the list while typing.
     fun picker(
         act: AppCompatActivity,
         titleText: String,
         labels: List<String>,
         selected: Int,
+        searchable: Boolean = false,
         onPick: (Int) -> Unit
     ) {
         val t = theme
         var dlg: AlertDialog? = null
+        var shown: List<Int> = labels.indices.toList()
         val rv = RecyclerView(act)
         val lm = LinearLayoutManager(act)
         rv.layoutManager = lm
-        rv.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        val ad = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             override fun onCreateViewHolder(
                 parent: ViewGroup, viewType: Int
             ): RecyclerView.ViewHolder {
@@ -130,18 +137,21 @@ class Ui(private val ctx: Context) {
 
             override fun onBindViewHolder(h: RecyclerView.ViewHolder, pos: Int) {
                 val tv = h.itemView as TextView
-                val sel = pos == selected
-                tv.text = (if (sel) "✓  " else "") + labels[pos]
+                val orig = shown[pos]
+                val sel = orig == selected
+                tv.text = (if (sel) "✓  " else "") + labels[orig]
                 tv.setTextColor(if (sel) t.accent else t.text)
                 tv.background = stateBg(rr(t.card, 12), 12)
                 tv.setOnClickListener {
                     dlg?.dismiss()
-                    onPick(pos)
+                    onPick(orig)
                 }
             }
 
-            override fun getItemCount(): Int = labels.size
+            override fun getItemCount(): Int = shown.size
         }
+        rv.adapter = ad
+
         val head = TextView(act)
         head.text = titleText
         head.textSize = 18f
@@ -151,10 +161,45 @@ class Ui(private val ctx: Context) {
         val box = LinearLayout(act)
         box.orientation = LinearLayout.VERTICAL
         box.addView(head)
-        box.addView(rv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(360)))
+        if (searchable) {
+            val et = EditText(act)
+            et.hint = act.getString(R.string.search_hint)
+            et.setSingleLine(true)
+            et.textSize = 15f
+            et.setTextColor(t.text)
+            et.setHintTextColor(t.sub)
+            et.setPadding(dp(14), dp(10), dp(14), dp(10))
+            et.background = rr(t.card, 12, alpha(t.sub, 0x66), 1)
+            et.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    val q = s?.toString()?.trim() ?: ""
+                    shown = if (q.isEmpty()) {
+                        labels.indices.toList()
+                    } else {
+                        labels.indices.filter { labels[it].contains(q, ignoreCase = true) }
+                    }
+                    ad.notifyDataSetChanged()
+                    lm.scrollToPosition(0)
+                }
+            })
+            val lpEt = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            lpEt.setMargins(dp(12), 0, dp(12), dp(6))
+            box.addView(et, lpEt)
+        }
+        box.addView(
+            rv,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(if (searchable) 300 else 360)
+            )
+        )
         val d = AlertDialog.Builder(act).setView(box).create()
         dlg = d
         d.window?.setBackgroundDrawable(rr(t.bg, 16))
+        d.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         d.show()
         if (selected in labels.indices) {
             rv.post {
