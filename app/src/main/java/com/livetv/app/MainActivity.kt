@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var dataSaver = false
     private var lite = false
     private var hideDead = true
+    private var verifiedOnly = false
     private var audioOnly = false
     private var attempt = 0
     private var urlIdx = 0
@@ -243,6 +244,7 @@ class MainActivity : AppCompatActivity() {
         dataSaver = store.getBool("datasaver", false)
         lite = store.getBool("lite", false)
         hideDead = store.getBool("hidedead", true)
+        verifiedOnly = store.getBool("verified", false)
         audioOnly = store.getBool("audioonly", false)
         favs = store.getList("fav")
         files = store.getList("files")
@@ -643,11 +645,22 @@ class MainActivity : AppCompatActivity() {
         btnAction.visibility = View.GONE
 
         btnMode = mkBtn("") {
-            val opts = listOf(getString(R.string.mode_country), getString(R.string.mode_category))
+            val opts = listOf(
+                getString(R.string.mode_country), getString(R.string.mode_category),
+                getString(R.string.mode_world)
+            )
             ui.picker(this, getString(R.string.pick_mode), opts, mode) { pos ->
-                mode = pos
-                store.putInt("mode", pos)
-                setItemsForMode()
+                val worldLocked = tab == 0 && pos == 2 &&
+                    store.getString("pin", "").isNotEmpty() &&
+                    lockedCats.isNotEmpty() && !unlocked.contains("world")
+                if (worldLocked) {
+                    askPin {
+                        unlocked.add("world")
+                        applyMode(pos)
+                    }
+                } else {
+                    applyMode(pos)
+                }
             }
         }
         btnItem = mkBtn("") {
@@ -749,14 +762,20 @@ class MainActivity : AppCompatActivity() {
         val showAction = tab == 0 || tab == 3 || (tab == 4 && openPlaylist == null)
         btnAction.visibility = if (showAction) View.VISIBLE else View.GONE
         btnAction.text = when (tab) {
-            0 -> if (scanning) getString(R.string.scan_stop) else getString(R.string.scan_btn)
+            0 -> if (scanning) getString(R.string.scan_stop) else scanLabel()
             3 -> getString(R.string.add_files)
             else -> getString(R.string.new_playlist_btn)
         }
     }
 
     private fun updatePickerLabels() {
-        btnMode.text = getString(if (mode == 0) R.string.mode_country else R.string.mode_category) + "  ▾"
+        val m = when (mode) {
+            0 -> R.string.mode_country
+            2 -> R.string.mode_world
+            else -> R.string.mode_category
+        }
+        btnMode.text = getString(m) + "  ▾"
+        btnItem.visibility = if (mode == 2) View.GONE else View.VISIBLE
         if (curIdx in curItems.indices) btnItem.text = curItems[curIdx].label + "  ▾"
     }
 
@@ -910,23 +929,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setItemsForMode() {
-        curItems = if (mode == 0) {
+        curItems = if (mode == 2) {
+            listOf(Item("World", "world"))
+        } else if (mode == 0) {
             countryItems
         } else if (tab == 0) {
             Data.categories
         } else {
             RData.tags
         }
-        val saved = store.getString("sel${tab}_$mode", if (mode == 0) "pk" else "news")
+        val saved = store.getString(
+            "sel${tab}_$mode",
+            if (mode == 0) "pk" else if (mode == 2) "world" else "news"
+        )
         val idx = curItems.indexOfFirst { it.key == saved }
         curIdx = if (idx < 0) 0 else idx
         updatePickerLabels()
         loadList(curItems[curIdx])
     }
 
-    private fun isLocked(item: Item): Boolean =
-        tab == 0 && mode == 1 && store.getString("pin", "").isNotEmpty() &&
-            lockedCats.contains(item.key) && !unlocked.contains(item.key)
+    private fun isLocked(item: Item): Boolean {
+        if (tab != 0 || store.getString("pin", "").isEmpty() || unlocked.contains(item.key)) return false
+        return (mode == 1 && lockedCats.contains(item.key)) ||
+            (mode == 2 && lockedCats.isNotEmpty())
+    }
 
     private fun selectItem(pos: Int) {
         if (pos !in curItems.indices) return
@@ -948,19 +974,25 @@ class MainActivity : AppCompatActivity() {
         if (key.startsWith("tv/")) parseM3u(text) else parseRadio(text)
 
     private fun fetchFor(key: String, item: Item): String? {
+        if (key == "tv/world") {
+            return store.download("https://iptv-org.github.io/iptv/index.m3u")
+        }
         if (key.startsWith("tv/")) {
             return store.download(
                 "https://iptv-org.github.io/iptv/" + key.removePrefix("tv/") + ".m3u"
             )
         }
-        val path = if (key.startsWith("radio/country/")) {
+        var q = "?hidebroken=true&order=clickcount&reverse=true&limit=500"
+        val path = if (key == "radio/world") {
+            q = "?hidebroken=true"
+            "topclick/1000"
+        } else if (key.startsWith("radio/country/")) {
             var cc = item.key.uppercase()
             if (cc == "UK") cc = "GB"
             "bycountrycodeexact/$cc"
         } else {
             "bytag/" + item.key
         }
-        val q = "?hidebroken=true&order=clickcount&reverse=true&limit=500"
         for (h in listOf("de1", "nl1", "at1")) {
             val t = store.download("https://$h.api.radio-browser.info/json/stations/$path$q")
             if (t != null && t.startsWith("[")) return t
@@ -978,27 +1010,39 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val key = if (tab == 0) {
-            (if (mode == 0) "tv/countries/" else "tv/categories/") + item.key
+            when (mode) {
+                0 -> "tv/countries/" + item.key
+                1 -> "tv/categories/" + item.key
+                else -> "tv/world"
+            }
         } else {
-            (if (mode == 0) "radio/country/" else "radio/tag/") + item.key
+            when (mode) {
+                0 -> "radio/country/" + item.key
+                1 -> "radio/tag/" + item.key
+                else -> "radio/world"
+            }
         }
         if (key == currentKey) return
         stopScan()
         currentKey = key
-        val cached = store.readCache(key)
-        loaded = if (cached != null) parseAny(key, cached) else emptyList()
+        loaded = emptyList()
         refreshList()
-        if (cached == null) setStatus(getString(R.string.status_loading_list))
+        setStatus(getString(R.string.status_loading_list))
         Thread {
-            // The list is downloaded once and kept; it is only refreshed when the cache is missing.
-            val text = if (cached == null) fetchFor(key, item) else null
+            // Lists are downloaded once and kept on the device.
+            var text = store.readCache(key)
+            if (text == null) {
+                text = fetchFor(key, item)
+                if (text != null) store.writeCache(key, text)
+            }
+            val parsed = if (text != null) parseAny(key, text) else null
             handler.post {
                 if (key != currentKey) return@post
-                if (text != null) {
-                    store.writeCache(key, text)
-                    loaded = parseAny(key, text)
+                if (parsed != null) {
+                    loaded = parsed
                     refreshList()
-                } else if (cached == null) {
+                    updateRows()
+                } else {
                     setStatus(getString(R.string.status_list_failed))
                 }
             }
@@ -1026,6 +1070,9 @@ class MainActivity : AppCompatActivity() {
             }
             base = keep
         }
+        if (tab == 0 && verifiedOnly) {
+            base = base.filter { c -> c.allUrls().any { Health.state(it) == 1 } }
+        }
         val q = search.text.toString().trim()
         var f: List<Channel> =
             if (q.isEmpty()) base else base.filter { it.name.contains(q, ignoreCase = true) }
@@ -1033,6 +1080,10 @@ class MainActivity : AppCompatActivity() {
         adapter.items = f
         adapter.notifyDataSetChanged()
         var s = getString(R.string.status_items, f.size)
+        if (tab == 0) {
+            val v = f.count { c -> c.allUrls().any { Health.state(it) == 1 } }
+            if (v > 0) s += "  ·  " + getString(R.string.status_verified, v)
+        }
         if (hidden > 0) s += "  ·  " + getString(R.string.status_hidden, hidden)
         if (!scanning) setStatus(s)
     }
@@ -1088,10 +1139,11 @@ class MainActivity : AppCompatActivity() {
         }
         scanning = true
         updateRows()
-        val ck = Checker(if (dataSaver || lite) 2 else 3)
+        val limit = if (mode == 2) 4000 else 2000
+        val ck = Checker(if (dataSaver || lite) 2 else if (mode == 2) 6 else 3)
         checker = ck
         var lastRefresh = 0L
-        ck.start(urls.take(2000)) { d, t ->
+        ck.start(urls.take(limit)) { d, t ->
             handler.post {
                 if (ck !== checker) return@post
                 if (d >= t) {
@@ -1362,6 +1414,12 @@ class MainActivity : AppCompatActivity() {
         acts.add { showSleep() }
         labels.add(getString(R.string.more_rec_timer))
         acts.add { showRecTimer() }
+        labels.add(getString(R.string.more_verified, onOff(verifiedOnly)))
+        acts.add {
+            verifiedOnly = !verifiedOnly
+            store.putBool("verified", verifiedOnly)
+            refreshList()
+        }
         labels.add(getString(R.string.more_settings))
         acts.add { showSettings() }
         ui.picker(this, getString(R.string.more_title), labels, -1) { i -> acts[i]() }
@@ -1424,6 +1482,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---------- part 2: language, lock, backup, timers, picture-in-picture ----------
+
+    private fun applyMode(pos: Int) {
+        mode = pos
+        store.putInt("mode", pos)
+        setItemsForMode()
+    }
+
+    private fun scanLabel(): String {
+        var left = 0
+        for (c in loaded) for (u in c.allUrls()) if (Health.state(u) == 0) left++
+        return if (left > 0) getString(R.string.scan_btn, left) else getString(R.string.scan_done)
+    }
 
     private fun showLanguage() {
         val cur = store.getString("lang", "en")

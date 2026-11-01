@@ -14,7 +14,7 @@
 - Start app on box boot (setting)
 - Favorites, playlists, gallery files, themes, logos, focus highlight
 
-## Part 2 (this zip) - DONE
+## Part 2 - DONE
 - Language picker + translations (English, Urdu, Arabic, Hindi, Bengali, Persian, Turkish, French, Spanish, Russian, Indonesian)
 - Parental lock (PIN + locked categories)
 - Backup / restore of favorites and playlists
@@ -25,3 +25,9 @@
 
 ## GitHub secrets needed once (see GITHUB_SECRETS.txt, kept outside this zip)
 KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS
+
+## Part 3 (this zip) - DONE
+- World mode: all channels of the world in one list (TV and Radio), no country needed
+- Search box searches the whole world list at once
+- Scan builds a verified list on the device; "Verified only" switch in More menu
+- Browse by: Country / Category / World

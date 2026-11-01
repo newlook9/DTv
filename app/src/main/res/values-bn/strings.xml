@@ -18,7 +18,7 @@
     <string name="pick_category">বিভাগ বাছুন</string>
     <string name="add_files">+ গ্যালারি থেকে ফাইল যোগ করুন</string>
     <string name="new_playlist_btn">+ নতুন প্লেলিস্ট</string>
-    <string name="scan_btn">চ্যানেল স্ক্যান করুন (একবার)</string>
+    <string name="scan_btn">চ্যানেল স্ক্যান করুন (%1$d বাকি)</string>
     <string name="scan_stop">স্ক্যান থামান</string>
     <string name="status_items">%1$dটি আইটেম</string>
     <string name="status_hidden">%1$dটি লুকানো</string>
@@ -122,4 +122,8 @@
     <string name="restore_failed">ব্যাকআপ ফাইল পড়া যায়নি</string>
     <string name="status_none">এখানে এখনও কিছু নেই</string>
     <string name="status_ch_number">চ্যানেল %1$d</string>
+    <string name="mode_world">বিশ্ব</string>
+    <string name="scan_done">সব চ্যানেল স্ক্যান হয়েছে</string>
+    <string name="more_verified">শুধু যাচাইকৃত: %1$s</string>
+    <string name="status_verified">%1$dটি যাচাইকৃত</string>
 </resources>

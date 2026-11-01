@@ -18,7 +18,7 @@
     <string name="pick_category">Pilih kategori</string>
     <string name="add_files">+ Tambah berkas dari galeri</string>
     <string name="new_playlist_btn">+ Playlist baru</string>
-    <string name="scan_btn">Pindai saluran (sekali)</string>
+    <string name="scan_btn">Pindai saluran (sisa %1$d)</string>
     <string name="scan_stop">Hentikan pemindaian</string>
     <string name="status_items">%1$d item</string>
     <string name="status_hidden">%1$d tersembunyi</string>
@@ -122,4 +122,8 @@
     <string name="restore_failed">Berkas cadangan tidak dapat dibaca</string>
     <string name="status_none">Belum ada apa-apa di sini</string>
     <string name="status_ch_number">Saluran %1$d</string>
+    <string name="mode_world">Dunia</string>
+    <string name="scan_done">Semua saluran sudah dipindai</string>
+    <string name="more_verified">Hanya terverifikasi: %1$s</string>
+    <string name="status_verified">%1$d terverifikasi</string>
 </resources>

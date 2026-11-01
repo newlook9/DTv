@@ -18,7 +18,7 @@
     <string name="pick_category">Выберите категорию</string>
     <string name="add_files">+ Добавить файлы из галереи</string>
     <string name="new_playlist_btn">+ Новый плейлист</string>
-    <string name="scan_btn">Сканировать каналы (один раз)</string>
+    <string name="scan_btn">Сканировать каналы (осталось %1$d)</string>
     <string name="scan_stop">Остановить</string>
     <string name="status_items">Элементов: %1$d</string>
     <string name="status_hidden">скрыто: %1$d</string>
@@ -122,4 +122,8 @@
     <string name="restore_failed">Не удалось прочитать файл копии</string>
     <string name="status_none">Здесь пока ничего нет</string>
     <string name="status_ch_number">Канал %1$d</string>
+    <string name="mode_world">Весь мир</string>
+    <string name="scan_done">Все каналы просканированы</string>
+    <string name="more_verified">Только проверенные: %1$s</string>
+    <string name="status_verified">проверено: %1$d</string>
 </resources>

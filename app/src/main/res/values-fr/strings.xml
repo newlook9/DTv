@@ -18,7 +18,7 @@
     <string name="pick_category">Choisir la catégorie</string>
     <string name="add_files">+ Ajouter des fichiers de la galerie</string>
     <string name="new_playlist_btn">+ Nouvelle playlist</string>
-    <string name="scan_btn">Analyser les chaînes (une fois)</string>
+    <string name="scan_btn">Analyser les chaînes (%1$d restantes)</string>
     <string name="scan_stop">Arrêter l\'analyse</string>
     <string name="status_items">%1$d éléments</string>
     <string name="status_hidden">%1$d masqués</string>
@@ -122,4 +122,8 @@
     <string name="restore_failed">Impossible de lire le fichier de sauvegarde</string>
     <string name="status_none">Rien ici pour l\'instant</string>
     <string name="status_ch_number">Chaîne %1$d</string>
+    <string name="mode_world">Monde</string>
+    <string name="scan_done">Toutes les chaînes sont analysées</string>
+    <string name="more_verified">Vérifiées uniquement : %1$s</string>
+    <string name="status_verified">%1$d vérifiées</string>
 </resources>
