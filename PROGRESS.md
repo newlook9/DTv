@@ -1,6 +1,6 @@
 # Live TV - build progress
 
-## Part 1 (this zip) - DONE
+## Part 1 - DONE
 - Crash guard + safe start (shows the error text on next launch)
 - Permanent signing key support + GitHub release for in-app updates (workflow)
 - In-app update check and one-tap install
@@ -14,7 +14,7 @@
 - Start app on box boot (setting)
 - Favorites, playlists, gallery files, themes, logos, focus highlight
 
-## Part 2 - TO DO
+## Part 2 (this zip) - DONE
 - Language picker + translations (English, Urdu, Arabic, Hindi, Bengali, Persian, Turkish, French, Spanish, Russian, Indonesian)
 - Parental lock (PIN + locked categories)
 - Backup / restore of favorites and playlists

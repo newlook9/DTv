@@ -1,6 +1,7 @@
 package com.livetv.app
 
 import android.Manifest
+import android.app.PictureInPictureParams
 import android.app.UiModeManager
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -19,7 +20,9 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
 import android.telephony.TelephonyManager
+import android.util.Rational
 import android.text.Editable
+import android.text.InputType
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.view.GestureDetector
@@ -40,7 +43,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -57,6 +62,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -119,6 +125,42 @@ class MainActivity : AppCompatActivity() {
     private var countryItems: List<Item> = Data.countries
     private var curItems: List<Item> = Data.countries
     private var safeMode = false
+    private var inPip = false
+    private var prevChannel: Channel? = null
+    private var recents: MutableList<Channel> = ArrayList()
+    private var blocked: MutableSet<String> = HashSet()
+    private var lockedCats: MutableSet<String> = HashSet()
+    private val unlocked = HashSet<String>()
+    private var numBuf = ""
+
+    private val numRun = Runnable {
+        val n = numBuf.toIntOrNull() ?: 0
+        numBuf = ""
+        val items = adapter.items.filter { !it.url.startsWith("pl:") && it.url != "back:" }
+        if (n in 1..items.size) play(items[n - 1])
+    }
+
+    private val sleepRun = Runnable {
+        player.pause()
+        val r = rec
+        if (r != null && r.active) r.stop()
+        setStatus(getString(R.string.sleep_done))
+    }
+
+    private val recStopRun = Runnable {
+        val r = rec
+        if (r != null && r.active) r.stop()
+    }
+
+    private val backupLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            if (uri != null) doBackup(uri)
+        }
+
+    private val restoreLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) doRestore(uri)
+        }
 
     private val retryRun = Runnable {
         player.seekToDefaultPosition()
@@ -205,6 +247,9 @@ class MainActivity : AppCompatActivity() {
         favs = store.getList("fav")
         files = store.getList("files")
         playlists = store.getPlaylists()
+        recents = store.getList("recent")
+        blocked = store.getSet("blocked")
+        lockedCats = store.getSet("locked")
         ui.lite = lite
 
         // Safe start: if the last run crashed, skip auto-play and refresh saved lists.
@@ -384,7 +429,10 @@ class MainActivity : AppCompatActivity() {
             scanning = false
             Health.save()
         }
+        val before = nowPlaying
+        if (before != null && before.url != ch.url) prevChannel = before
         nowPlaying = ch
+        addRecent(ch)
         handler.removeCallbacks(retryRun)
         attempt = 0
         urlQueue = ch.allUrls().sortedBy { rank(Health.state(it)) }
@@ -717,7 +765,7 @@ class MainActivity : AppCompatActivity() {
         val match = ViewGroup.LayoutParams.MATCH_PARENT
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
         val ctrl = WindowCompat.getInsetsController(window, window.decorView)
-        val full = (!isTv && land) || (isTv && tvFull)
+        val full = inPip || (!isTv && land) || (isTv && tvFull)
         if (full) {
             root.orientation = LinearLayout.VERTICAL
             left.layoutParams = LinearLayout.LayoutParams(match, match)
@@ -810,6 +858,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode >= KeyEvent.KEYCODE_0 && keyCode <= KeyEvent.KEYCODE_9 && currentFocus !is EditText) {
+            numBuf += (keyCode - KeyEvent.KEYCODE_0).toString()
+            if (numBuf.length > 4) numBuf = numBuf.takeLast(4)
+            setStatus(getString(R.string.status_ch_number, numBuf.toInt()))
+            handler.removeCallbacks(numRun)
+            handler.postDelayed(numRun, 1500)
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_LAST_CHANNEL) {
+            goPrevious()
+            return true
+        }
         if (isTv && tvFull) {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> {
@@ -864,10 +924,21 @@ class MainActivity : AppCompatActivity() {
         loadList(curItems[curIdx])
     }
 
+    private fun isLocked(item: Item): Boolean =
+        tab == 0 && mode == 1 && store.getString("pin", "").isNotEmpty() &&
+            lockedCats.contains(item.key) && !unlocked.contains(item.key)
+
     private fun selectItem(pos: Int) {
         if (pos !in curItems.indices) return
-        curIdx = pos
         val item = curItems[pos]
+        if (isLocked(item)) {
+            askPin {
+                unlocked.add(item.key)
+                selectItem(pos)
+            }
+            return
+        }
+        curIdx = pos
         store.putString("sel${tab}_$mode", item.key)
         updatePickerLabels()
         loadList(item)
@@ -898,6 +969,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadList(item: Item) {
+        if (isLocked(item)) {
+            stopScan()
+            currentKey = ""
+            loaded = emptyList()
+            refreshList()
+            setStatus(getString(R.string.lock_locked))
+            return
+        }
         val key = if (tab == 0) {
             (if (mode == 0) "tv/countries/" else "tv/categories/") + item.key
         } else {
@@ -938,6 +1017,7 @@ class MainActivity : AppCompatActivity() {
                 pl.items
             }
         }
+        if (tab <= 1 && blocked.isNotEmpty()) base = base.filter { !blocked.contains(it.url) }
         var hidden = 0
         if (tab == 0 && hideDead) {
             val keep = ArrayList<Channel>()
@@ -1110,6 +1190,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun moveIn(list: MutableList<Channel>, ch: Channel, d: Int) {
+        val i = list.indexOfFirst { it.url == ch.url }
+        val j = i + d
+        if (i < 0 || j < 0 || j >= list.size) return
+        val t = list[i]
+        list[i] = list[j]
+        list[j] = t
+    }
+
     private fun showItemMenu(ch: Channel) {
         if (ch.url == "back:") return
         if (ch.url.startsWith("pl:")) {
@@ -1128,6 +1217,28 @@ class MainActivity : AppCompatActivity() {
         acts.add { toggleFav(ch) }
         labels.add(getString(R.string.m_playlist_add))
         acts.add { addToPlaylist(ch) }
+        if (tab <= 1) {
+            labels.add(getString(R.string.m_hide))
+            acts.add {
+                blocked.add(ch.url)
+                store.putSet("blocked", blocked)
+                refreshList()
+            }
+        }
+        if (tab == 2) {
+            labels.add(getString(R.string.m_up))
+            acts.add {
+                moveIn(favs, ch, -1)
+                store.saveList("fav", favs)
+                refreshList()
+            }
+            labels.add(getString(R.string.m_down))
+            acts.add {
+                moveIn(favs, ch, 1)
+                store.saveList("fav", favs)
+                refreshList()
+            }
+        }
         if (tab == 3) {
             labels.add(getString(R.string.m_remove_list))
             acts.add {
@@ -1137,6 +1248,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
         if (tab == 4 && openPlaylist != null) {
+            labels.add(getString(R.string.m_up))
+            acts.add {
+                openPlaylist?.items?.let { moveIn(it, ch, -1) }
+                store.savePlaylists(playlists)
+                refreshList()
+            }
+            labels.add(getString(R.string.m_down))
+            acts.add {
+                openPlaylist?.items?.let { moveIn(it, ch, 1) }
+                store.savePlaylists(playlists)
+                refreshList()
+            }
             labels.add(getString(R.string.m_remove_playlist))
             acts.add {
                 openPlaylist?.items?.removeAll { it.url == ch.url }
@@ -1225,12 +1348,20 @@ class MainActivity : AppCompatActivity() {
         }
         val labels = ArrayList<String>()
         val acts = ArrayList<() -> Unit>()
+        labels.add(getString(R.string.more_last))
+        acts.add { goPrevious() }
+        labels.add(getString(R.string.more_recent))
+        acts.add { showRecent() }
         labels.add(getString(R.string.more_fit, fitName))
         acts.add {
             fitIdx = (fitIdx + 1) % 3
             store.putInt("fit", fitIdx)
             applyFit()
         }
+        labels.add(getString(R.string.more_sleep))
+        acts.add { showSleep() }
+        labels.add(getString(R.string.more_rec_timer))
+        acts.add { showRecTimer() }
         labels.add(getString(R.string.more_settings))
         acts.add { showSettings() }
         ui.picker(this, getString(R.string.more_title), labels, -1) { i -> acts[i]() }
@@ -1243,6 +1374,7 @@ class MainActivity : AppCompatActivity() {
             labels.add(l)
             acts.add(a)
         }
+        add(getString(R.string.set_language)) { showLanguage() }
         add(getString(R.string.set_theme)) { showTheme() }
         add(getString(R.string.on_off, getString(R.string.set_data_saver), onOff(dataSaver))) {
             dataSaver = !dataSaver
@@ -1270,6 +1402,15 @@ class MainActivity : AppCompatActivity() {
             store.putBool("boot", !store.getBool("boot", false))
             setStatus(getString(R.string.on_off, getString(R.string.set_boot), onOff(store.getBool("boot", false))))
         }
+        add(getString(R.string.set_parental)) { showParental() }
+        add(getString(R.string.set_backup)) { backupLauncher.launch("livetv-backup.json") }
+        add(getString(R.string.set_restore)) { restoreLauncher.launch(arrayOf("application/json", "*/*")) }
+        add(getString(R.string.set_unhide)) {
+            blocked.clear()
+            store.putSet("blocked", blocked)
+            refreshList()
+            setStatus(getString(R.string.done_msg))
+        }
         add(getString(R.string.set_updates)) { Updater.check(this, true) }
         add(getString(R.string.set_reset)) {
             stopScan()
@@ -1280,6 +1421,196 @@ class MainActivity : AppCompatActivity() {
             setStatus(getString(R.string.done_msg))
         }
         ui.picker(this, getString(R.string.settings_title), labels, -1) { i -> acts[i]() }
+    }
+
+    // ---------- part 2: language, lock, backup, timers, picture-in-picture ----------
+
+    private fun showLanguage() {
+        val cur = store.getString("lang", "en")
+        val idx = Lang.list.indexOfFirst { it.second == cur }
+        ui.picker(this, getString(R.string.set_language), Lang.list.map { it.first }, idx) { i ->
+            val code = Lang.list[i].second
+            store.putString("lang", code)
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(code))
+        }
+    }
+
+    private fun addRecent(ch: Channel) {
+        recents.removeAll { it.url == ch.url }
+        recents.add(0, ch)
+        while (recents.size > 30) recents.removeAt(recents.size - 1)
+        store.saveList("recent", recents)
+    }
+
+    private fun goPrevious() {
+        val p = prevChannel
+        if (p == null) setStatus(getString(R.string.status_none)) else play(p)
+    }
+
+    private fun showRecent() {
+        if (recents.isEmpty()) {
+            setStatus(getString(R.string.status_none))
+            return
+        }
+        val list = ArrayList(recents)
+        ui.picker(this, getString(R.string.more_recent), list.map { it.name }, -1) { i ->
+            play(list[i])
+        }
+    }
+
+    private fun showSleep() {
+        val mins = listOf(0, 15, 30, 45, 60, 90, 120)
+        val names = mins.map {
+            if (it == 0) getString(R.string.sleep_off) else getString(R.string.minutes, it)
+        }
+        ui.picker(this, getString(R.string.sleep_title), names, -1) { i ->
+            handler.removeCallbacks(sleepRun)
+            if (mins[i] > 0) {
+                handler.postDelayed(sleepRun, mins[i] * 60000L)
+                setStatus(getString(R.string.sleep_set, mins[i]))
+            } else {
+                setStatus(getString(R.string.sleep_off))
+            }
+        }
+    }
+
+    private fun showRecTimer() {
+        val mins = listOf(5, 15, 30, 60, 120)
+        ui.picker(this, getString(R.string.rec_for_title), mins.map { getString(R.string.minutes, it) }, -1) { i ->
+            val r = rec
+            if (r == null || !r.active) toggleRecord()
+            handler.removeCallbacks(recStopRun)
+            handler.postDelayed(recStopRun, mins[i] * 60000L)
+        }
+    }
+
+    private fun askPin(onOk: () -> Unit) {
+        val pin = store.getString("pin", "")
+        if (pin.isEmpty()) {
+            onOk()
+            return
+        }
+        val et = EditText(this)
+        et.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pin_enter)
+            .setView(et)
+            .setPositiveButton(R.string.dlg_ok) { _, _ ->
+                if (et.text.toString() == pin) onOk() else setStatus(getString(R.string.pin_wrong))
+            }
+            .setNegativeButton(R.string.dlg_cancel, null)
+            .show()
+    }
+
+    private fun setNewPin() {
+        val et = EditText(this)
+        et.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pin_new)
+            .setView(et)
+            .setPositiveButton(R.string.dlg_ok) { _, _ ->
+                val v = et.text.toString()
+                if (v.length >= 4) {
+                    store.putString("pin", v)
+                    setStatus(getString(R.string.pin_saved))
+                }
+            }
+            .setNegativeButton(R.string.dlg_cancel, null)
+            .show()
+    }
+
+    private fun showParental() {
+        askPin {
+            val labels = ArrayList<String>()
+            val acts = ArrayList<() -> Unit>()
+            labels.add(getString(R.string.pl_set_pin))
+            acts.add { setNewPin() }
+            labels.add(getString(R.string.pl_categories))
+            acts.add { chooseLocked() }
+            labels.add(getString(R.string.pl_remove_pin))
+            acts.add {
+                store.putString("pin", "")
+                unlocked.clear()
+                setStatus(getString(R.string.pin_removed))
+            }
+            ui.picker(this, getString(R.string.set_parental), labels, -1) { i -> acts[i]() }
+        }
+    }
+
+    private fun chooseLocked() {
+        val cats = Data.categories
+        val checked = BooleanArray(cats.size) { lockedCats.contains(cats[it].key) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pl_categories)
+            .setMultiChoiceItems(cats.map { it.label }.toTypedArray(), checked) { _, i, c ->
+                checked[i] = c
+            }
+            .setPositiveButton(R.string.dlg_ok) { _, _ ->
+                lockedCats.clear()
+                for (i in cats.indices) if (checked[i]) lockedCats.add(cats[i].key)
+                store.putSet("locked", lockedCats)
+                unlocked.clear()
+                if (store.getString("pin", "").isEmpty()) setNewPin()
+            }
+            .setNegativeButton(R.string.dlg_cancel, null)
+            .show()
+    }
+
+    private fun doBackup(uri: Uri) {
+        try {
+            val o = JSONObject()
+            o.put("fav", JSONArray(store.getString("fav", "[]")))
+            o.put("files", JSONArray(store.getString("files", "[]")))
+            o.put("playlists", JSONArray(store.getString("playlists", "[]")))
+            o.put("blocked", JSONArray(store.getString("blocked", "[]")))
+            contentResolver.openOutputStream(uri)?.use { it.write(o.toString().toByteArray()) }
+            setStatus(getString(R.string.backup_done))
+        } catch (e: Exception) {
+            setStatus(getString(R.string.backup_failed))
+        }
+    }
+
+    private fun doRestore(uri: Uri) {
+        try {
+            val text = contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: ""
+            val o = JSONObject(text)
+            for (k in listOf("fav", "files", "playlists", "blocked")) {
+                val a = o.optJSONArray(k)
+                if (a != null) store.putString(k, a.toString())
+            }
+            favs = store.getList("fav")
+            files = store.getList("files")
+            playlists = store.getPlaylists()
+            blocked = store.getSet("blocked")
+            updateFavBtn()
+            refreshList()
+            setStatus(getString(R.string.restore_done))
+        } catch (e: Exception) {
+            setStatus(getString(R.string.restore_failed))
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT >= 26 && !isTv && player.isPlaying &&
+            player.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO)
+        ) {
+            try {
+                enterPictureInPictureMode(
+                    PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+                )
+            } catch (e: Exception) {
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip = isInPictureInPictureMode
+        applyLayout()
     }
 
     // ---------- lifecycle ----------
@@ -1369,7 +1700,7 @@ class MainActivity : AppCompatActivity() {
             val playing = ch.url == nowPlaying?.url
 
             h.row.background = ui.stateBg(ui.rr(t.card, 14), 14)
-            h.name.text = ch.name
+            h.name.text = if (isTv && tab <= 3) "${position + 1}   " + ch.name else ch.name
             h.name.setTextColor(if (playing) t.accent else t.text)
             h.name.setTypeface(null, if (playing) Typeface.BOLD else Typeface.NORMAL)
             h.heart.setTextColor(t.accent)
