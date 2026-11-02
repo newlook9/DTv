@@ -126,4 +126,12 @@
     <string name="status_verified">%1$d सत्यापित</string>
     <string name="scan_short">स्कैन</string>
     <string name="scan_left">स्कैन (%1$d)</string>
+    <string name="status_reconnecting">इंटरनेट लौट आया। दोबारा जुड़ रहे हैं…</string>
+    <string name="more_boost">आवाज़ बढ़ाएँ: %1$s</string>
+    <string name="more_sort">क्रम: %1$s</string>
+    <string name="sort_default">मूल क्रम</string>
+    <string name="sort_az">A से Z</string>
+    <string name="sort_verified">सत्यापित पहले</string>
+    <string name="fav_added">पसंदीदा में जोड़ा: %1$s</string>
+    <string name="fav_removed">पसंदीदा से हटाया: %1$s</string>
 </resources>

@@ -126,4 +126,12 @@
     <string name="status_verified">%1$d terverifikasi</string>
     <string name="scan_short">Pindai</string>
     <string name="scan_left">Pindai (%1$d)</string>
+    <string name="status_reconnecting">Internet kembali. Menyambung ulang…</string>
+    <string name="more_boost">Penguat volume: %1$s</string>
+    <string name="more_sort">Urutan: %1$s</string>
+    <string name="sort_default">Urutan asli</string>
+    <string name="sort_az">A sampai Z</string>
+    <string name="sort_verified">Terverifikasi dulu</string>
+    <string name="fav_added">Ditambahkan ke favorit: %1$s</string>
+    <string name="fav_removed">Dihapus dari favorit: %1$s</string>
 </resources>

@@ -126,4 +126,12 @@
     <string name="status_verified">проверено: %1$d</string>
     <string name="scan_short">Скан</string>
     <string name="scan_left">Скан (%1$d)</string>
+    <string name="status_reconnecting">Интернет снова доступен. Переподключение…</string>
+    <string name="more_boost">Усиление звука: %1$s</string>
+    <string name="more_sort">Сортировка: %1$s</string>
+    <string name="sort_default">Исходный порядок</string>
+    <string name="sort_az">A–Z</string>
+    <string name="sort_verified">Сначала проверенные</string>
+    <string name="fav_added">Добавлено в избранное: %1$s</string>
+    <string name="fav_removed">Убрано из избранного: %1$s</string>
 </resources>

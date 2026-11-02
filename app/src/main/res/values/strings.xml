@@ -128,4 +128,12 @@
     <string name="status_verified">%1$d verified</string>
     <string name="scan_short">Scan</string>
     <string name="scan_left">Scan (%1$d)</string>
+    <string name="status_reconnecting">Internet is back. Reconnecting…</string>
+    <string name="more_boost">Volume boost: %1$s</string>
+    <string name="more_sort">Sort: %1$s</string>
+    <string name="sort_default">Original order</string>
+    <string name="sort_az">A to Z</string>
+    <string name="sort_verified">Verified first</string>
+    <string name="fav_added">Added to favorites: %1$s</string>
+    <string name="fav_removed">Removed from favorites: %1$s</string>
 </resources>

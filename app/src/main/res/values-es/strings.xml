@@ -126,4 +126,12 @@
     <string name="status_verified">%1$d verificados</string>
     <string name="scan_short">Escanear</string>
     <string name="scan_left">Escanear (%1$d)</string>
+    <string name="status_reconnecting">Internet ha vuelto. Reconectando…</string>
+    <string name="more_boost">Aumento de volumen: %1$s</string>
+    <string name="more_sort">Orden: %1$s</string>
+    <string name="sort_default">Orden original</string>
+    <string name="sort_az">De A a Z</string>
+    <string name="sort_verified">Verificados primero</string>
+    <string name="fav_added">Añadido a favoritos: %1$s</string>
+    <string name="fav_removed">Quitado de favoritos: %1$s</string>
 </resources>

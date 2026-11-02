@@ -126,4 +126,12 @@
     <string name="status_verified">%1$d doğrulandı</string>
     <string name="scan_short">Tara</string>
     <string name="scan_left">Tara (%1$d)</string>
+    <string name="status_reconnecting">İnternet geri geldi. Yeniden bağlanılıyor…</string>
+    <string name="more_boost">Ses yükseltme: %1$s</string>
+    <string name="more_sort">Sırala: %1$s</string>
+    <string name="sort_default">Özgün sıra</string>
+    <string name="sort_az">A\'dan Z\'ye</string>
+    <string name="sort_verified">Doğrulananlar önce</string>
+    <string name="fav_added">Favorilere eklendi: %1$s</string>
+    <string name="fav_removed">Favorilerden kaldırıldı: %1$s</string>
 </resources>

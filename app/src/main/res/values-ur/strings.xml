@@ -126,4 +126,12 @@
     <string name="status_verified">%1$d تصدیق شدہ</string>
     <string name="scan_short">اسکین</string>
     <string name="scan_left">اسکین (%1$d)</string>
+    <string name="status_reconnecting">انٹرنیٹ واپس آ گیا۔ دوبارہ جڑ رہے ہیں…</string>
+    <string name="more_boost">آواز بڑھائیں: %1$s</string>
+    <string name="more_sort">ترتیب: %1$s</string>
+    <string name="sort_default">اصل ترتیب</string>
+    <string name="sort_az">A سے Z</string>
+    <string name="sort_verified">تصدیق شدہ پہلے</string>
+    <string name="fav_added">پسندیدہ میں شامل: %1$s</string>
+    <string name="fav_removed">پسندیدہ سے ہٹایا: %1$s</string>
 </resources>

@@ -126,4 +126,12 @@
     <string name="status_verified">%1$d تأییدشده</string>
     <string name="scan_short">اسکن</string>
     <string name="scan_left">اسکن (%1$d)</string>
+    <string name="status_reconnecting">اینترنت برگشت. در حال اتصال مجدد…</string>
+    <string name="more_boost">تقویت صدا: %1$s</string>
+    <string name="more_sort">مرتب‌سازی: %1$s</string>
+    <string name="sort_default">ترتیب اصلی</string>
+    <string name="sort_az">A تا Z</string>
+    <string name="sort_verified">تأییدشده‌ها اول</string>
+    <string name="fav_added">به علاقه‌مندی‌ها افزوده شد: %1$s</string>
+    <string name="fav_removed">از علاقه‌مندی‌ها حذف شد: %1$s</string>
 </resources>

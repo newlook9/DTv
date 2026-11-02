@@ -12,7 +12,12 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
+import android.media.AudioManager
+import android.media.audiofx.LoudnessEnhancer
 import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -110,6 +115,21 @@ class MainActivity : AppCompatActivity() {
     private var lite = false
     private var hideDead = true
     private var verifiedOnly = false
+    private var sortIdx = 0
+    private var boostIdx = 0
+    private var waitingNet = false
+    private var enhancer: LoudnessEnhancer? = null
+    private var netCb: ConnectivityManager.NetworkCallback? = null
+    private val boostGain = intArrayOf(0, 300, 600, 1000)
+    private val boostNames = arrayOf("", "+3 dB", "+6 dB", "+10 dB")
+
+    private val resumeTick = object : Runnable {
+        override fun run() {
+            saveResume()
+            val c = nowPlaying
+            if (c != null && c.url.startsWith("content:")) handler.postDelayed(this, 15000)
+        }
+    }
     private var audioOnly = false
     private var attempt = 0
     private var urlIdx = 0
@@ -210,6 +230,7 @@ class MainActivity : AppCompatActivity() {
                 setStatus(getString(R.string.status_buffering, n))
             } else if (state == Player.STATE_READY) {
                 attempt = 0
+                waitingNet = false
                 urlQueue.getOrNull(urlIdx)?.let { Health.mark(it, true) }
                 setStatus(getString(R.string.status_playing, n))
                 updateRadioCard()
@@ -220,6 +241,10 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPlayerError(error: PlaybackException) {
             handleError()
+        }
+
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            applyBoost()
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -246,6 +271,8 @@ class MainActivity : AppCompatActivity() {
         lite = store.getBool("lite", false)
         hideDead = store.getBool("hidedead", true)
         verifiedOnly = store.getBool("verified", false)
+        sortIdx = store.getInt("sort", 0)
+        boostIdx = store.getInt("boost", 0)
         audioOnly = store.getBool("audioonly", false)
         favs = store.getList("fav")
         files = store.getList("files")
@@ -278,6 +305,8 @@ class MainActivity : AppCompatActivity() {
         setupBack()
         applyQuality()
         applyAudioOnly()
+        applyBoost()
+        registerNet()
         loadCountriesFromNet()
 
         if (store.getString("sel0_0", "").isEmpty()) {
@@ -432,11 +461,15 @@ class MainActivity : AppCompatActivity() {
             scanning = false
             Health.save()
         }
+        saveResume()
         val before = nowPlaying
         if (before != null && before.url != ch.url) prevChannel = before
         nowPlaying = ch
         addRecent(ch)
+        waitingNet = false
         handler.removeCallbacks(retryRun)
+        handler.removeCallbacks(resumeTick)
+        if (ch.url.startsWith("content:")) handler.postDelayed(resumeTick, 15000)
         attempt = 0
         urlQueue = ch.allUrls().sortedBy { rank(Health.state(it)) }
         urlIdx = 0
@@ -456,7 +489,8 @@ class MainActivity : AppCompatActivity() {
         val mb = MediaMetadata.Builder().setTitle(ch.name)
         if (ch.logo.isNotEmpty()) mb.setArtworkUri(Uri.parse(ch.logo))
         val item = MediaItem.Builder().setUri(url).setMediaMetadata(mb.build()).build()
-        player.setMediaItem(item)
+        val startAt = if (url.startsWith("content:")) resumePos(url) else 0L
+        if (startAt > 0L) player.setMediaItem(item, startAt) else player.setMediaItem(item)
         player.prepare()
         player.playWhenReady = true
     }
@@ -464,7 +498,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleError() {
         val ch = nowPlaying ?: return
         if (urlIdx + 1 < urlQueue.size) {
-            urlQueue.getOrNull(urlIdx)?.let { Health.mark(it, false) }
+            if (isOnline()) urlQueue.getOrNull(urlIdx)?.let { Health.mark(it, false) }
             urlIdx++
             setStatus(getString(R.string.status_alt))
             startUrl(ch, urlQueue[urlIdx])
@@ -473,7 +507,8 @@ class MainActivity : AppCompatActivity() {
             setStatus(getString(R.string.status_retry, attempt, 3))
             handler.postDelayed(retryRun, 3000)
         } else {
-            urlQueue.getOrNull(urlIdx)?.let { Health.mark(it, false) }
+            if (isOnline()) urlQueue.getOrNull(urlIdx)?.let { Health.mark(it, false) }
+            waitingNet = true
             setStatus(getString(R.string.status_dead))
         }
     }
@@ -886,6 +921,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Number keys: type a channel number from the remote
         if (keyCode >= KeyEvent.KEYCODE_0 && keyCode <= KeyEvent.KEYCODE_9 && currentFocus !is EditText) {
             numBuf += (keyCode - KeyEvent.KEYCODE_0).toString()
             if (numBuf.length > 4) numBuf = numBuf.takeLast(4)
@@ -894,19 +930,121 @@ class MainActivity : AppCompatActivity() {
             handler.postDelayed(numRun, 1500)
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_LAST_CHANNEL) {
-            goPrevious()
-            return true
+        when (keyCode) {
+            KeyEvent.KEYCODE_LAST_CHANNEL -> {
+                goPrevious()
+                return true
+            }
+            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_MEDIA_NEXT,
+            KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD -> {
+                step(1)
+                return true
+            }
+            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD -> {
+                step(-1)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                player.playWhenReady = !player.playWhenReady
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                player.playWhenReady = true
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_STOP -> {
+                player.pause()
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                seekBy(10000L)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                seekBy(-10000L)
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_RED -> {
+                nowPlaying?.let { toggleFav(it) }
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_GREEN -> {
+                showQuality()
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_YELLOW -> {
+                toggleRecord()
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_BLUE -> {
+                showMore()
+                return true
+            }
+            KeyEvent.KEYCODE_MENU -> {
+                val t = currentFocus?.tag
+                if (t is Channel) showItemMenu(t) else showMore()
+                return true
+            }
+            KeyEvent.KEYCODE_SEARCH -> {
+                search.requestFocus()
+                return true
+            }
+            KeyEvent.KEYCODE_GUIDE -> {
+                if (tvFull) {
+                    tvFull = false
+                    applyLayout()
+                }
+                return true
+            }
+        }
+        if (isTv) {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    am.adjustStreamVolume(
+                        AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI
+                    )
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    am.adjustStreamVolume(
+                        AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI
+                    )
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_MUTE -> {
+                    if (Build.VERSION.SDK_INT >= 23) {
+                        am.adjustStreamVolume(
+                            AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE,
+                            AudioManager.FLAG_SHOW_UI
+                        )
+                        return true
+                    }
+                }
+            }
         }
         if (isTv && tvFull) {
             when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> {
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_PAGE_DOWN -> {
                     step(-1)
                     return true
                 }
-                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_UP -> {
                     step(1)
                     return true
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (nowPlaying?.url?.startsWith("content:") == true) {
+                        seekBy(-10000L)
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (nowPlaying?.url?.startsWith("content:") == true) {
+                        seekBy(10000L)
+                        return true
+                    }
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     tvFull = false
@@ -1082,6 +1220,13 @@ class MainActivity : AppCompatActivity() {
         if (tab == 0 && verifiedOnly) {
             base = base.filter { c -> c.allUrls().any { Health.state(it) == 1 } }
         }
+        if (tab <= 1) {
+            base = when (sortIdx) {
+                1 -> base.sortedBy { it.name.lowercase() }
+                2 -> base.sortedBy { c -> if (c.allUrls().any { Health.state(it) == 1 }) 0 else 1 }
+                else -> base
+            }
+        }
         val q = search.text.toString().trim()
         var f: List<Channel> =
             if (q.isEmpty()) base else base.filter { it.name.contains(q, ignoreCase = true) }
@@ -1197,6 +1342,7 @@ class MainActivity : AppCompatActivity() {
         store.saveList("fav", favs)
         updateFavBtn()
         if (tab == 2) refreshList() else adapter.notifyDataSetChanged()
+        setStatus(getString(if (ex != null) R.string.fav_removed else R.string.fav_added, ch.name))
     }
 
     private fun onItemClick(ch: Channel) {
@@ -1423,6 +1569,18 @@ class MainActivity : AppCompatActivity() {
         acts.add { showSleep() }
         labels.add(getString(R.string.more_rec_timer))
         acts.add { showRecTimer() }
+        labels.add(getString(R.string.more_boost, boostLabel()))
+        acts.add {
+            boostIdx = (boostIdx + 1) % boostGain.size
+            store.putInt("boost", boostIdx)
+            applyBoost()
+        }
+        labels.add(getString(R.string.more_sort, sortLabel()))
+        acts.add {
+            sortIdx = (sortIdx + 1) % 3
+            store.putInt("sort", sortIdx)
+            refreshList()
+        }
         labels.add(getString(R.string.more_verified, onOff(verifiedOnly)))
         acts.add {
             verifiedOnly = !verifiedOnly
@@ -1502,6 +1660,119 @@ class MainActivity : AppCompatActivity() {
         var left = 0
         for (c in loaded) for (u in c.allUrls()) if (Health.state(u) == 0) left++
         return if (left > 0) getString(R.string.scan_left, left) else "✓ " + getString(R.string.scan_short)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isOnline(): Boolean {
+        return try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            cm.activeNetworkInfo?.isConnected == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // When the internet comes back, a channel that stopped is started again by itself.
+    private fun registerNet() {
+        try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val cb = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    handler.post { onNetBack() }
+                }
+            }
+            val req = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            cm.registerNetworkCallback(req, cb)
+            netCb = cb
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun unregisterNet() {
+        try {
+            val cb = netCb
+            if (cb != null) {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                cm.unregisterNetworkCallback(cb)
+            }
+        } catch (e: Exception) {
+        }
+        netCb = null
+    }
+
+    private fun onNetBack() {
+        val ch = nowPlaying ?: return
+        if (!waitingNet) return
+        waitingNet = false
+        attempt = 0
+        urlIdx = 0
+        if (urlQueue.isEmpty()) urlQueue = ch.allUrls()
+        setStatus(getString(R.string.status_reconnecting))
+        startUrl(ch, urlQueue[0])
+    }
+
+    private fun applyBoost() {
+        try {
+            enhancer?.release()
+            enhancer = null
+            if (boostIdx > 0) {
+                val sid = player.audioSessionId
+                if (sid != C.AUDIO_SESSION_ID_UNSET) {
+                    val e = LoudnessEnhancer(sid)
+                    e.setTargetGain(boostGain[boostIdx])
+                    e.enabled = true
+                    enhancer = e
+                }
+            }
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun boostLabel(): String =
+        if (boostIdx == 0) getString(R.string.off) else boostNames[boostIdx]
+
+    private fun sortLabel(): String = when (sortIdx) {
+        1 -> getString(R.string.sort_az)
+        2 -> getString(R.string.sort_verified)
+        else -> getString(R.string.sort_default)
+    }
+
+    // Gallery videos and songs continue from where they were stopped.
+    private fun saveResume() {
+        val ch = nowPlaying ?: return
+        if (!ch.url.startsWith("content:")) return
+        try {
+            val dur = player.duration
+            val pos = player.currentPosition
+            val o = try {
+                JSONObject(store.getString("resume", "{}"))
+            } catch (e: Exception) {
+                JSONObject()
+            }
+            if (dur > 0 && pos > 5000L && pos < dur - 10000L) o.put(ch.url, pos) else o.remove(ch.url)
+            if (o.length() > 60) {
+                val k = o.keys().next()
+                o.remove(k)
+            }
+            store.putString("resume", o.toString())
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun resumePos(url: String): Long {
+        return try {
+            JSONObject(store.getString("resume", "{}")).optLong(url, 0L)
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    private fun seekBy(ms: Long) {
+        val cur = nowPlaying ?: return
+        if (!cur.url.startsWith("content:")) return
+        player.seekTo((player.currentPosition + ms).coerceAtLeast(0L))
     }
 
     private fun showLanguage() {
@@ -1703,11 +1974,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        saveResume()
         if (player.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO)) player.pause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        saveResume()
+        unregisterNet()
+        try {
+            enhancer?.release()
+        } catch (e: Exception) {
+        }
+        enhancer = null
         store.putBool("launching", false)
         handler.removeCallbacksAndMessages(null)
         checker?.stop()
@@ -1800,8 +2079,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             h.row.setOnClickListener { onItemClick(ch) }
+            h.row.tag = ch
             h.row.setOnLongClickListener {
-                showItemMenu(ch)
+                val special = ch.url.startsWith("pl:") || ch.url == "back:"
+                if (isTv && !special) toggleFav(ch) else showItemMenu(ch)
                 true
             }
         }

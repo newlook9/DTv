@@ -32,7 +32,26 @@ KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS
 - Scan builds a verified list on the device; "Verified only" switch in More menu
 - Browse by: Country / Category / World
 
-## Part 4 (this zip) - DONE
+## Part 4 - DONE
 - Scan button moved to the top right (next to the Live TV logo)
 - Country and category lists have a search box inside the dropdown
 - Channel search box moved up beside the dropdowns (more room for channels)
+
+## Part 5 (this zip) - DONE
+- Channel restarts by itself when the internet comes back
+- Volume boost (+3 / +6 / +10 dB), sort (original / A-Z / verified first)
+- Gallery videos and songs continue from the saved position
+- Android box: long-press OK adds/removes a favorite
+- Android box remote map:
+  - CH+ / CH-, Media next / previous : next / previous channel
+  - Play/Pause, Play, Pause, Stop     : control playback
+  - FF / Rewind (and Left/Right in full screen) : seek 10 s for gallery files
+  - Up/Down in full screen            : previous / next channel
+  - OK in full screen                 : back to the list
+  - Number keys                       : type a channel number
+  - Volume + / - / Mute               : system volume
+  - Menu                              : menu of the selected channel (or More menu)
+  - Search                            : go to the search box
+  - Guide                             : back to the list
+  - Red: favorite, Green: quality, Yellow: record, Blue: More menu
+  - Last channel key                  : previous channel

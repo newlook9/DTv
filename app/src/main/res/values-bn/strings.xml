@@ -126,4 +126,12 @@
     <string name="status_verified">%1$dটি যাচাইকৃত</string>
     <string name="scan_short">স্ক্যান</string>
     <string name="scan_left">স্ক্যান (%1$d)</string>
+    <string name="status_reconnecting">ইন্টারনেট ফিরে এসেছে। আবার সংযোগ হচ্ছে…</string>
+    <string name="more_boost">ভলিউম বুস্ট: %1$s</string>
+    <string name="more_sort">সাজানো: %1$s</string>
+    <string name="sort_default">মূল ক্রম</string>
+    <string name="sort_az">A থেকে Z</string>
+    <string name="sort_verified">যাচাইকৃত আগে</string>
+    <string name="fav_added">প্রিয়তে যোগ হয়েছে: %1$s</string>
+    <string name="fav_removed">প্রিয় থেকে সরানো হয়েছে: %1$s</string>
 </resources>

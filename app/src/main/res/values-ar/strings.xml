@@ -126,4 +126,12 @@
     <string name="status_verified">%1$d موثّقة</string>
     <string name="scan_short">فحص</string>
     <string name="scan_left">فحص (%1$d)</string>
+    <string name="status_reconnecting">عاد الإنترنت. جارٍ إعادة الاتصال…</string>
+    <string name="more_boost">تعزيز الصوت: %1$s</string>
+    <string name="more_sort">الترتيب: %1$s</string>
+    <string name="sort_default">الترتيب الأصلي</string>
+    <string name="sort_az">من A إلى Z</string>
+    <string name="sort_verified">الموثّقة أولاً</string>
+    <string name="fav_added">أُضيف إلى المفضلة: %1$s</string>
+    <string name="fav_removed">أُزيل من المفضلة: %1$s</string>
 </resources>
